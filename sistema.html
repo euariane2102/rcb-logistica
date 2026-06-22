@@ -237,7 +237,7 @@ body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(-
   </aside>
   <main class="main">
     <div class="top">
-      <div><h1 id="vtitle">Painel</h1><div class="sub" id="vsub">Operação de hoje — 16/06/2026</div></div>
+      <div><h1 id="vtitle">Painel</h1><div class="sub" id="vsub">Operação de hoje</div></div>
       <div class="user"><div class="avatar" style="cursor:pointer" onclick="mostrarDadosLogin()" title="dados do login">RC</div><div class="txt"><b id="userNome">Gestor</b><br><span style="font-size:11px;color:var(--vinho);cursor:pointer;font-weight:600" onclick="logout()">Sair ⎋</span></div></div>
     </div>
     <div class="wrap">
@@ -306,8 +306,8 @@ body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(-
             <div class="fld"><label>Motorista</label><select id="upMot"></select></div>
             <div class="fld"><label>Qtd (t)</label><input id="upQtd" type="number" value="30"></div>
             <div class="fld full"><label>Destino / Cliente</label><select id="upCli"></select></div>
-            <div class="fld"><label>Programado para carregar</label><input id="upDe" type="date" value="2026-06-16"></div>
-            <div class="fld"><label>Programado para entregar</label><input id="upAte" type="date" value="2026-06-16"></div>
+            <div class="fld"><label>Programado para carregar</label><input id="upDe" type="date"></div>
+            <div class="fld"><label>Programado para entregar</label><input id="upAte" type="date"></div>
             <div class="fld"><label>Valor do frete (R$) <span style="font-weight:400;color:var(--cinza2)">opcional</span></label><input id="upFrete" type="text" inputmode="decimal" placeholder="ex.: 4.500,00"></div>
             <div class="fld"><label>⛽ Ordem de abastecimento necessária?</label><select id="upAbast"><option value="sim">Sim</option><option value="nao">Não</option></select></div>
             <div class="fld full"><label>📎 Anexar NF-e / manifesto (opcional)</label><input type="file" id="upAnexo" accept="application/pdf,image/*"></div>
@@ -315,8 +315,8 @@ body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(-
           <div class="btn-row hidden" id="btnrowContainer"><button class="btn btn-p" onclick="incluirPedido()">Incluir pedido</button><button class="btn btn-o" onclick="importarLote()">⤓ Importar lista</button></div>
         </div>
         <div class="toolbar">
-          <button class="btn btn-g sm" onclick="document.getElementById('fData').value='2026-06-16';renderPed()">Hoje</button>
-          <button class="btn btn-g sm" onclick="document.getElementById('fData').value=diaSeguinte('2026-06-16');renderPed()">Amanhã</button>
+          <button class="btn btn-g sm" onclick="document.getElementById('fData').value=HOJE;renderPed()">Hoje</button>
+          <button class="btn btn-g sm" onclick="document.getElementById('fData').value=diaSeguinte(HOJE);renderPed()">Amanhã</button>
           <input id="fData" type="date" class="fld" style="padding:9px 12px;border:1px solid var(--linha);border-radius:9px" onchange="renderPed()" title="filtrar por data">
           <button class="btn btn-g sm" onclick="document.getElementById('fData').value='';pedFilterStatus=null;renderPed()">Todos os dias</button>
         </div>
@@ -683,7 +683,9 @@ const FLOW=["PROG","ENVIADO","CARREG","VIAGEM","AGUARD","ENTREGUE"];
 const LBL={PROG:"Programado",ENVIADO:"Pedido enviado",CARREG:"Carregando",VIAGEM:"Em viagem",AGUARD:"Aguard. descarga",ENTREGUE:"Entregue"};
 const TABS=[["dash","▦","Painel"],["prog","⚙️","Programação"],["ped","📦","Pedidos"],["frota","🚚","Frota"],["mot","👤","Motoristas"],["cli","🏢","Clientes"],["abast","⛽","Abastec."],["fat","📊","Relatórios"]];
 const EMPRESA="+5541998322530";
-const HOJE="2026-06-16";
+// Data de HOJE em horário LOCAL (não usar toISOString — vira o dia à noite no fuso BR)
+const HOJE=(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")})();
+const HOJE_BR=HOJE.split("-").reverse().join("/"); // ex.: 21/06/2026
 function diaSeguinte(iso){const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()+1);return d.toISOString().slice(0,10)}
 function atrasado(p){return p.st!=="ENTREGUE"&&p.st!=="PROG"&&p.ate<HOJE}
 function diasAtraso(p){const a=new Date(p.ate),h=new Date(HOJE);return Math.round((h-a)/86400000)}
@@ -691,7 +693,7 @@ const $=s=>document.querySelector(s);
 function toast(m){const t=$("#toast");t.innerHTML=m;t.classList.add("on");clearTimeout(window._t);window._t=setTimeout(()=>t.classList.remove("on"),3800)}
 function carDe(mot){return frota.find(x=>x.mot===mot)||{cav:"—",car:"—",cat:"",wa:""}}
 function fmtD(iso){if(!iso)return"—";const[a,m,d]=iso.split("-");return d+"/"+m}
-function agora(){const d=new Date(2026,5,16,10,30);return d}
+function agora(){return new Date()}
 function dataExtenso(){const ms=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];const d=new Date();return `${String(d.getDate()).padStart(2,"0")} de ${ms[d.getMonth()]} de ${d.getFullYear()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
 function log(a){acoes.unshift({hora:new Date().toLocaleString("pt-BR"),acao:a})}
 function chip(st,onclick){return `<span class="st st-${st}" ${onclick?`onclick="${onclick}"`:""}><span class="dot"></span>${LBL[st]}</span>`}
@@ -847,8 +849,13 @@ function pedCard(p,i,full){
   </div>`;
 }
 function renderDash(){
-  // planilha rosa: TODOS os pedidos (programados e em execução)
-  const pedidosOrdenados=[...pedidos].sort((a,b)=>a.de.localeCompare(b.de));
+  // planilha rosa: SOMENTE os pedidos do dia (janela que inclui hoje) + os que seguem ativos em atraso
+  const doDia=pedidos.filter(p=>(p.de<=HOJE&&p.ate>=HOJE)||(p.st!=="ENTREGUE"&&p.st!=="PROG"&&p.ate<HOJE));
+  const pedidosOrdenados=[...doDia].sort((a,b)=>a.de.localeCompare(b.de));
+  if(!pedidosOrdenados.length){
+    $("#dashProgTable").innerHTML=`<tr><td colspan="5" style="text-align:center;color:#9aa3ad;padding:26px">Nenhum pedido para hoje (${HOJE_BR}). Inclua ou programe pedidos na aba <b>Pedidos</b>.</td></tr>`;
+    renderFleetDetail();return;
+  }
   $("#dashProgTable").innerHTML=pedidosOrdenados.map(p=>{const idx=pedidos.indexOf(p);return `<tr><td>${fmtD(p.de)}${p.ate!==p.de?" → "+fmtD(p.ate):""}</td><td onclick="painelCli(${idx})" title="clique para trocar o cliente" style="cursor:pointer"><b style="text-decoration:underline dotted #a06ab8">${p.cli}</b></td><td onclick="painelMot(${idx})" title="clique para trocar o motorista" style="cursor:pointer"><span style="text-decoration:underline dotted #a06ab8">${p.mot||"— definir —"}</span>${p.abastEnviado?' <span title="ordem de abastecimento enviada">⛽</span>':''}</td><td onclick="painelPed(${idx})" title="clique para editar o nº do pedido" style="cursor:pointer"><code style="background:#eef1f5;padding:3px 7px;border-radius:5px">${p.ped||"sem nº"}</code></td><td style="display:flex;gap:6px;align-items:center">${chip(p.st,"avancar("+idx+")")} <button class="iconbtn" style="width:auto;padding:0 6px;font-size:16px" onclick="voltar(${idx})" title="voltar status">↺</button></td></tr>`}).join("");
   renderFleetDetail();
 }
@@ -942,7 +949,7 @@ async function incluirPedido(){
     }catch(e){toast("⚠ Erro ao enviar anexo.");}
   }
 }
-function importarLote(){const t=prompt("Cole os nº de pedido (um por linha):");if(!t)return;const ns=t.split(/[\n,;\s]+/).filter(x=>x.length>=6);ns.forEach(n=>pedidos.push({ped:n.trim(),fab:fabricas[0],cli:clientes[0].nome,qtd:30,mot:"",de:"2026-06-16",ate:"2026-06-16",st:"PROG"}));log(ns.length+" pedidos importados");renderAll();toast("✓ "+ns.length+" pedidos importados.")}
+function importarLote(){const t=prompt("Cole os nº de pedido (um por linha):");if(!t)return;const ns=t.split(/[\n,;\s]+/).filter(x=>x.length>=6);ns.forEach(n=>pedidos.push({ped:n.trim(),fab:fabricas[0],cli:clientes[0].nome,qtd:30,mot:"",de:HOJE,ate:HOJE,st:"PROG"}));log(ns.length+" pedidos importados");renderAll();toast("✓ "+ns.length+" pedidos importados.")}
 // ===== FÁBRICAS (origens de carga) =====
 function fabRowsHTML(){return fabricas.map((f,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--linha)"><span style="flex:1;font-weight:600">🏭 ${f}</span><button class="iconbtn" onclick="renFabrica(${i})" title="renomear">✎</button><button class="iconbtn del" onclick="delFabrica(${i})" title="excluir">🗑</button></div>`).join("")}
 function gerenciarFabricas(){openForm("Fábricas / origens de carga","Cadastre de onde a carga é retirada (nem sempre é Votorantim)",`<div class="fld full"><label>Nova fábrica</label><div style="display:flex;gap:8px"><input id="novaFab" placeholder="Ex.: Votorantim, Itambé, Supermix..." style="flex:1;padding:11px 12px;border:1px solid var(--linha);border-radius:9px;font-size:15px"><button class="btn btn-p sm" style="width:auto" onclick="addFabrica()">+ Add</button></div></div><div class="fld full" id="fabList">${fabRowsHTML()}</div>`,()=>{closeForm();renderAll();})}
@@ -1011,7 +1018,7 @@ function abMotChange(){const f=carDe($("#abMot").value);$("#abPlaca").value=f.ca
 function abrirAbastPara(mot){$("#abMot").value=mot;abMotChange();go('abast');}
 function abCompletarToggle(){const on=$("#abCompletar").checked;$("#abVal").disabled=on;$("#abVal").style.background=on?"#f0f2f5":"#fff";$("#abVal").placeholder=on?"COMPLETAR TANQUE":"4.719,90";const eb=$("#abExtraBox");if(eb)eb.style.display=on?"block":"none"}
 function msgAbast(a){const aut=a.completar?("COMPLETAR TANQUE"+(a.extra?" + R$ "+a.extra:"")):a.val;return `${dataExtenso()}\n\nRCBMIX LOGÍSTICA\n\nPlaca: ${a.placa}\nAutorizações: ${aut}\nDestino: ${a.dest}\nNota fiscal: ${a.nf}\nMotorista: ${a.mot}\n\n${a.posto.toUpperCase()}`}
-function coletarAbast(){const comp=$("#abCompletar").checked;return {data:"2026-06-16",hora:agora().getHours()+":"+String(agora().getMinutes()).padStart(2,"0"),placa:$("#abPlaca").value,val:$("#abVal").value||"0,00",completar:comp,extra:comp?($("#abExtra").value||""):"",dest:$("#abDest").value||"-",nf:$("#abNf").value||"-",mot:$("#abMot").value,posto:$("#abPosto").value,st:"CARREG"}}
+function coletarAbast(){const comp=$("#abCompletar").checked;const agr=agora();return {data:HOJE,hora:agr.getHours()+":"+String(agr.getMinutes()).padStart(2,"0"),placa:$("#abPlaca").value,val:$("#abVal").value||"0,00",completar:comp,extra:comp?($("#abExtra").value||""):"",dest:$("#abDest").value||"-",nf:$("#abNf").value||"-",mot:$("#abMot").value,posto:$("#abPosto").value,st:"CARREG"}}
 function enviarAbast(){const a=coletarAbast();abast.unshift(a);const posto=postos.find(p=>p.nome===a.posto);enviarAuto(a.posto,posto?posto.wa:"",msgAbast(a),"Abastecimento → posto");marcarAbastNoPedido(a.mot);limparAbast();renderAll();toast("🟢 Ordem enviada ao posto e marcada no pedido de "+a.mot+".")}
 function marcarAbastNoPedido(mot){const p=pedidos.find(p=>p.mot===mot&&p.st!=="ENTREGUE"&&p.st!=="PROG")||pedidos.find(p=>p.mot===mot&&p.st!=="ENTREGUE");if(p){p.abastEnviado=true;log("Ordem de abastecimento enviada — marcada no pedido "+(p.ped||"s/nº")+" ("+mot+")");}}
 function salvarAbast(){const a=coletarAbast();abast.unshift(a);limparAbast();renderAll();toast("Ordem salva (não enviada).")}
@@ -1308,12 +1315,14 @@ function progSelecionaFrota(i){
 function renderAll(){renderAlertas();renderFleet();renderDash();renderDocs();renderProg();renderPed();renderFrota();renderMot();renderCli();renderPostos();renderAbast();renderEnviadas();renderFat();salvarDados();}
 
 // ===== NAV =====
-const titles={dash:["Painel","Operação de hoje — 16/06/2026"],docs:["Notas e Manifestos","Todos os anexos de NF-e, manifestos e notas de abastecimento"],ped:["Pedidos","Inclua, programe (data de/até) e envie no WhatsApp"],fat:["Relatórios","Volume transportado, entregas e desempenho"],frota:["Frota","Caminhões — visão geral por status"],mot:["Motoristas","Incluir, editar ou excluir motoristas"],cli:["Clientes","Nome, cidade, localização e telefone"],abast:["Abastecimento","Envio automático ao posto via WhatsApp"]};
+const titles={dash:["Painel","Operação de hoje — "+HOJE_BR],docs:["Notas e Manifestos","Todos os anexos de NF-e, manifestos e notas de abastecimento"],ped:["Pedidos","Inclua, programe (data de/até) e envie no WhatsApp"],fat:["Relatórios","Volume transportado, entregas e desempenho"],frota:["Frota","Caminhões — visão geral por status"],mot:["Motoristas","Incluir, editar ou excluir motoristas"],cli:["Clientes","Nome, cidade, localização e telefone"],abast:["Abastecimento","Envio automático ao posto via WhatsApp"]};
 function go(v){document.querySelectorAll(".view").forEach(x=>x.classList.remove("on"));$("#"+v).classList.add("on");document.querySelectorAll("#navD a,#navM a").forEach(x=>x.classList.toggle("on",x.dataset.v===v));$("#vtitle").textContent=titles[v][0];$("#vsub").textContent=titles[v][1];window.scrollTo(0,0)}
 function toggleUploader(){$("#uprowContainer").classList.toggle("hidden");$("#btnrowContainer").classList.toggle("hidden");const icon=$("#uploaderIcon");icon.textContent=icon.textContent==="➕"?"➖":"➕";}
 $("#navD").innerHTML=TABS.map((t,i)=>`<a data-v="${t[0]}" class="${i===0?"on":""}" onclick="go('${t[0]}')"><span class="ic">${t[1]}</span><span class="txt">${t[2]}</span></a>`).join("");
 $("#navM").innerHTML=TABS.map((t,i)=>`<a data-v="${t[0]}" class="${i===0?"on":""}" onclick="go('${t[0]}')"><span class="ic">${t[1]}</span>${t[2]}</a>`).join("");
 // inicialização: carrega cache local na hora, depois sincroniza com a nuvem
+$("#vsub").textContent=titles.dash[1]; // mostra a data de hoje no subtítulo do painel
+(function(){const a=$("#upDe"),b=$("#upAte");if(a&&!a.value)a.value=HOJE;if(b&&!b.value)b.value=HOJE;})(); // defaults dos campos de data = hoje
 try{renderAbastForm();renderAll();}catch(e){console.error("Erro na renderização inicial:",e);}
 (async()=>{
   try{
