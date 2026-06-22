@@ -822,12 +822,14 @@ function enviarPedidoWa(i){
 
 // ===== PAINEL =====
 function fleetCounts(){
-  const busy={ENVIADO:0,CARREG:0,VIAGEM:0,AGUARD:0};const ocupado=new Set();
-  pedidos.forEach(p=>{if(busy[p.st]!==undefined&&p.mot){busy[p.st]++;ocupado.add(p.mot);}});
-  const manut=frota.filter(f=>manutSet.has(f.mot)).length;
-  const disp=frota.length-manut-[...ocupado].filter(m=>!manutSet.has(m)).length;
+  const busy={ENVIADO:0,CARREG:0,VIAGEM:0,AGUARD:0};
+  pedidos.forEach(p=>{if(busy[p.st]!==undefined&&p.mot)busy[p.st]++;});
+  // disponíveis/manutenção contados pela MESMA fonte que a lista (statusDe),
+  // para o card nunca contradizer o status mostrado na frota.
+  let manut=0,disp=0;
+  frota.forEach(f=>{const s=statusDe(f.mot);if(s==="MANUT")manut++;else if(s==="DISP")disp++;});
   const prog=pedidos.filter(p=>p.st==="PROG").length;
-  return {total:frota.length,...busy,manut,disp:Math.max(disp,0),prog};
+  return {total:frota.length,...busy,manut,disp,prog};
 }
 function renderFleet(){
   const c=fleetCounts();
@@ -987,7 +989,8 @@ function renFabrica(i){const novo=prompt("Renomear fábrica:",fabricas[i]);if(no
 function delFabrica(i){if(fabricas.length<=1){toast("Mantenha ao menos uma fábrica.");return}if(confirm("Excluir a fábrica "+fabricas[i]+"?")){log("Fábrica excluída: "+fabricas[i]);fabricas.splice(i,1);salvarDados();document.getElementById("fabList").innerHTML=fabRowsHTML();toast("Fábrica excluída.")}}
 
 // ===== FROTA =====
-function statusDe(mot){if(manutSet.has(mot))return"MANUT";const p=pedidos.find(p=>p.mot===mot&&["ENVIADO","CARREG","VIAGEM","AGUARD"].includes(p.st));return p?p.st:"DISP"}
+function normMot(s){return (s||"").toString().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim().toUpperCase();}
+function statusDe(mot){if(manutSet.has(mot))return"MANUT";const m=normMot(mot);const p=pedidos.find(p=>normMot(p.mot)===m&&["ENVIADO","CARREG","VIAGEM","AGUARD"].includes(p.st));return p?p.st:"DISP"}
 // ===== LAUDOS (vencimentos anual/trimestral por veículo) =====
 function fmtDL(iso){if(!iso)return"—";const[a,m,d]=iso.split("-");return d+"/"+m+"/"+a;}
 function diasAte(iso){if(!iso)return null;const hoje=new Date();hoje.setHours(0,0,0,0);const dt=new Date(iso+"T00:00:00");return Math.round((dt-hoje)/86400000);}
@@ -1326,9 +1329,10 @@ function renderProg(){
     </div>
   `).join("");
 
-  // Frota disponível
-  const frotaDisp=frota.filter(f=>!manutSet.has(f.mot)).map((f,i)=>{
-    const atual=pedidos.find(p=>p.mot===f.mot&&p.st!=="ENTREGUE"&&p.st!=="PROG");
+  // Frota disponível — só caminhões realmente livres (statusDe==="DISP").
+  // Mantém o índice ORIGINAL de `frota` para a seleção não atribuir ao motorista errado.
+  const frotaDisp=frota.map((f,i)=>({f,i})).filter(({f})=>statusDe(f.mot)==="DISP").map(({f,i})=>{
+    const atual=pedidos.find(p=>normMot(p.mot)===normMot(f.mot)&&p.st!=="ENTREGUE"&&p.st!=="PROG");
     const cap=100;
     return {f,i,atual,cap};
   });
