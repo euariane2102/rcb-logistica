@@ -248,6 +248,7 @@ body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(-
         <div id="alertaSemMot"></div>
         <div id="alertaSemAbast"></div>
         <div id="alertaManut"></div>
+        <div id="alertaLaudo"></div>
         <div class="fleet" id="fleet"></div>
         <div class="legenda">
           <b>STATUS:</b>
@@ -863,12 +864,12 @@ function renderDash(){
 function painelCli(i){
   const p=pedidos[i];
   openForm("Trocar cliente","Pedido "+(p.ped||"s/nº"),
-    selHTML("pCli","Destino / Cliente",clientes.map(c=>c.nome),p.cli,true),
+    selHTML("pCli","Destino / Cliente",clientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(c=>c.nome),p.cli,true),
     ()=>{p.cli=fv("pCli");log("Cliente do pedido "+(p.ped||"s/nº")+" → "+p.cli);closeForm();renderAll();toast("✓ Cliente atualizado.");});
 }
 function painelMot(i){
   const p=pedidos[i];
-  const mots=["— sem motorista —",...frota.filter(f=>!manutSet.has(f.mot)).map(f=>{const o=pedidos.find(x=>x.mot===f.mot&&x.st!=="ENTREGUE"&&x!==p);return f.mot+(o?" (em "+o.cli+" - "+o.st.toLowerCase()+")":"");})];
+  const mots=["— sem motorista —",...frota.filter(f=>!manutSet.has(f.mot)).slice().sort((a,b)=>a.mot.localeCompare(b.mot,"pt-BR")).map(f=>{const o=pedidos.find(x=>x.mot===f.mot&&x.st!=="ENTREGUE"&&x!==p);return f.mot+(o?" (em "+o.cli+" - "+o.st.toLowerCase()+")":"");})];
   openForm("Trocar motorista","Pedido "+(p.ped||"s/nº"),
     selHTML("pMot","Motorista",mots,p.mot||"— sem motorista —",true),
     ()=>{const old=p.mot;const v=fv("pMot");p.mot=(v==="— sem motorista —")?"":v.replace(/ \(em .*\)$/,"");if(old!==p.mot)log("Troca de motorista no pedido "+(p.ped||"s/nº")+": "+(old||"-")+" → "+(p.mot||"-"));closeForm();renderAll();toast("✓ Motorista atualizado.");});
@@ -892,8 +893,8 @@ function renderPed(){
   $("#statusFilterLabel").textContent=label;
   $("#pedCount").textContent=lista.length;
   $("#pedBody").innerHTML=lista.map(x=>pedCard(x.p,x.i,true)).join("");
-  $("#upMot").innerHTML=`<option value="">— sem motorista —</option>`+frota.filter(f=>!manutSet.has(f.mot)).map(f=>{const p=pedidos.find(x=>x.mot===f.mot&&x.st!=="ENTREGUE");return `<option>${f.mot}${p?" ("+p.cli+" - "+p.st.toLowerCase()+")":""}</option>`;}).join("");
-  $("#upCli").innerHTML=clientes.map(c=>`<option>${c.nome}</option>`).join("");
+  $("#upMot").innerHTML=`<option value="">— sem motorista —</option>`+frota.filter(f=>!manutSet.has(f.mot)).slice().sort((a,b)=>a.mot.localeCompare(b.mot,"pt-BR")).map(f=>{const p=pedidos.find(x=>x.mot===f.mot&&x.st!=="ENTREGUE");return `<option>${f.mot}${p?" ("+p.cli+" - "+p.st.toLowerCase()+")":""}</option>`;}).join("");
+  $("#upCli").innerHTML=clientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(c=>`<option>${c.nome}</option>`).join("");
   $("#upFab").innerHTML='<option value="">— selecione a fábrica —</option>'+fabricas.map(f=>`<option>${f}</option>`).join("");
 }
 function avancar(i){
@@ -915,7 +916,7 @@ function editar(i){
     fldHTML("ePed","Nº do pedido",p.ped,true)+
     selHTML("eFab","Fábrica (origem)",fabricas,p.fab||fabricas[0],true)+
     selHTML("eMot","Motorista (trocar)",mots,p.mot||"— sem motorista —",true)+
-    selHTML("eCli","Destino / Cliente",clientes.map(c=>c.nome),p.cli,true)+
+    selHTML("eCli","Destino / Cliente",clientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(c=>c.nome),p.cli,true)+
     fldHTML("eQtd","Qtd (t)",p.qtd,false,"number")+
     selHTML("eSt","Status",FLOW.map(s=>LBL[s]),LBL[p.st])+
     fldHTML("eDe","Programado para carregar",p.de,false,"date")+
@@ -1003,7 +1004,7 @@ function renderFrota(){
 // ===== MOTORISTAS =====
 function renderMot(){
   const busca=$("#motBusca")?$("#motBusca").value.toUpperCase():"";
-  const filtrados=frota.filter(f=>f.mot.includes(busca));
+  const filtrados=frota.filter(f=>f.mot.includes(busca)).sort((a,b)=>a.mot.localeCompare(b.mot,"pt-BR"));
   $("#motCount").textContent=filtrados.length;
   $("#motBody").innerHTML=filtrados.map((f,i)=>{const idx=frota.indexOf(f);return `<div class="item"><div class="who" style="flex:1 1 220px"><b style="font-size:17px">${f.mot}</b><span class="cat">${f.cat}</span></div><div class="dest"><div class="c">📱 ${f.wa||"sem WhatsApp"}</div></div><div class="actions"><button class="iconbtn" onclick="editMot(${idx},'mot')" title="editar">✎</button><button class="iconbtn del" onclick="delMot(${idx})" title="excluir">🗑</button></div></div>`}).join("");
 }
@@ -1012,7 +1013,7 @@ function addMot(){const nome=$("#nmNome").value.trim().toUpperCase();if(!nome){t
 function delMot(i){const f=frota[i];if(pedidos.some(p=>p.mot===f.mot&&p.st!=="ENTREGUE"&&p.st!=="PROG")){toast("⚠ "+f.mot+" tem carga ativa.");return;}if(confirm("Excluir "+f.mot+"?")){log("Motorista "+f.mot+" excluído");frota.splice(i,1);manutSet.delete(f.mot);renderAll();toast(f.mot+" excluído.")}}
 
 // ===== ABASTECIMENTO =====
-function renderAbastForm(){$("#abMot").innerHTML=frota.map(f=>`<option>${f.mot}</option>`).join("");$("#abPosto").innerHTML=postos.map(p=>`<option>${p.nome}</option>`).join("");abMotChange()}
+function renderAbastForm(){$("#abMot").innerHTML=frota.slice().sort((a,b)=>a.mot.localeCompare(b.mot,"pt-BR")).map(f=>`<option>${f.mot}</option>`).join("");$("#abPosto").innerHTML=postos.map(p=>`<option>${p.nome}</option>`).join("");abMotChange()}
 function ehFrota(mot){const c=(carDe(mot).cat||"");return c==="FROTA"||c==="NÚCLEO"}
 function abMotChange(){const f=carDe($("#abMot").value);$("#abPlaca").value=f.cav;}
 function abrirAbastPara(mot){$("#abMot").value=mot;abMotChange();go('abast');}
@@ -1068,11 +1069,12 @@ function renderAlertas(){
     .filter(m=>m.dias===null||m.dias<=1)
     .sort((a,b)=>(a.dias===null?99:a.dias)-(b.dias===null?99:b.dias));
   if($("#alertaManut"))$("#alertaManut").innerHTML=manut.length?`<div class="alerta" style="border-left-color:#c0392b;background:#fff3f0;margin-bottom:13px"><div class="at" style="color:#a5281b">🔧 ${manut.length} caminhão(ões) em manutenção precisam de atenção</div>${manut.map(m=>{let txt,cor;if(m.dias===null){txt="⚠ sem previsão de retorno";cor="#a5281b";}else if(m.dias<0){txt="🔴 atrasado "+Math.abs(m.dias)+" dia(s) — deveria ter saído";cor="#a5281b";}else if(m.dias===0){txt="🟠 deve sair HOJE";cor="#c07a2a";}else{txt="🟡 sai AMANHÃ";cor="#b08900";}return `<div class="ar"><span><b>${m.mot}</b>${m.d.motivo?" · "+m.d.motivo:""}${m.d.dataSaida?" · prev. "+fmtD(m.d.dataSaida):""}</span><span style="color:${cor};font-weight:700">${txt} <button class="btn btn-wa sm" style="display:inline-flex;width:auto;padding:5px 10px" onclick="enviarManutWa('${m.mot}')">📲 cobrar</button> <button class="btn btn-g sm" style="display:inline-flex;width:auto;padding:5px 10px" onclick="editarManut('${m.mot}')">✎ previsão</button></span></div>`}).join("")}</div>`:"";
+  if($("#alertaLaudo"))$("#alertaLaudo").innerHTML=laudoBannerHTML();
 }
 // ===== CLIENTES =====
 function renderCli(){
   const busca=$("#cliBusca")?$("#cliBusca").value.toUpperCase():"";
-  const filtrados=clientes.filter(c=>(c.nome.toUpperCase().includes(busca)||(c.cidade||"").toUpperCase().includes(busca)));
+  const filtrados=clientes.filter(c=>(c.nome.toUpperCase().includes(busca)||(c.cidade||"").toUpperCase().includes(busca))).sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR"));
   if($("#cliCount"))$("#cliCount").textContent=filtrados.length;
   $("#cliBody").innerHTML=filtrados.map((c,i)=>{const idx=clientes.indexOf(c);return `<div class="item"><div class="who"><b>${c.nome}</b></div><div class="dest"><div class="c">${c.cidade||"—"}</div><div class="p">${c.tel||"sem telefone"} ${c.local?`· <a href="${c.local}" target="_blank" style="color:var(--vinho)">📍 localização</a>`:""}</div></div><div class="actions"><button class="iconbtn" onclick="editCli(${idx})" title="editar">✎</button><button class="iconbtn del" onclick="delCli(${idx})" title="excluir">🗑</button></div></div>`}).join("");
 }
