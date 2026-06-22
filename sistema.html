@@ -337,15 +337,12 @@ body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(-
       <section class="view" id="mot">
         <div class="row-head"><h2>Motoristas (<span id="motCount"></span>)</h2><div style="display:flex;gap:8px"><button class="btn btn-p sm" onclick="toggleAdd()">+ Incluir</button></div></div>
         <div class="uploader" id="addBox" style="display:none">
-          <div class="tt">+ Novo motorista / caminhão</div>
+          <div class="tt">+ Novo motorista</div>
+          <div class="hint" style="margin-bottom:8px">As placas e laudos ficam no cadastro da <b>Frota</b>. Aqui é só o motorista; depois você vincula um veículo a ele na aba Frota.</div>
           <div class="uprow">
             <div class="fld"><label>Nome / apelido</label><input id="nmNome" placeholder="Ex.: MARCOS"></div>
             <div class="fld"><label>Categoria</label><select id="nmCat"><option>FROTA</option><option>NÚCLEO</option><option>AGREGADO</option><option>TERCEIRO</option></select></div>
-            <div class="fld"><label>Placa do cavalo</label><input id="nmCav" class="num" placeholder="AAA-0000"></div>
-            <div class="fld"><label>Placa da carreta</label><input id="nmCar" class="num" placeholder="AAA-0000"></div>
             <div class="fld full"><label>WhatsApp do motorista</label><input id="nmWa" class="num" placeholder="+55 41 9xxxx-xxxx" inputmode="tel"></div>
-            <div class="fld"><label>Vencimento laudo ANUAL</label><input id="nmLaudoAnual" type="date"></div>
-            <div class="fld"><label>Vencimento laudo TRIMESTRAL</label><input id="nmLaudoTrim" type="date"></div>
           </div>
           <div class="btn-row"><button class="btn btn-p" onclick="addMot()">Salvar</button><button class="btn btn-o" onclick="toggleAdd()">Cancelar</button></div>
         </div>
@@ -614,6 +611,16 @@ let frota = [
   {mot:"JULIO",cav:"MKB-5B25",car:"MKB-5B26",cat:"TERCEIRO",rast:true,wa:"+5541999000030"},
   {mot:"TIAGO",cav:"—",car:"—",cat:"FROTA",rast:true,wa:"+5541997652780"},
 ];
+// Cadastro de MOTORISTAS independente da frota: {nome, wa, cat}. O vínculo com o veículo é por NOME (frota[i].mot).
+let motoristas = [];
+let _motoristasNaNuvem=false; // true quando a nuvem já tem o cadastro de motoristas salvo (não derivar da frota)
+function buildMotoristasFromFrota(){
+  const vis=new Set();const novo=[];
+  (frota||[]).forEach(f=>{if(f.mot&&f.mot!=="—"&&!vis.has(f.mot)){vis.add(f.mot);novo.push({nome:f.mot,wa:f.wa||"",cat:f.cat||"FROTA"});}});
+  motoristas=novo;
+}
+// fallback: só deriva da frota se ainda não houver lista de motoristas em memória
+function migrarMotoristas(){ if(!Array.isArray(motoristas)||!motoristas.length) buildMotoristasFromFrota(); }
 const manutSet = new Set(["COUTINHO","GENINHO","SABIA","BOLA"]);
 const manutData = {COUTINHO:{motivo:"Revisão",dataSaida:"2025-01-25"},GENINHO:{motivo:"Pneu",dataSaida:"2025-01-24"},SABIA:{motivo:"Motor",dataSaida:"2025-01-23"},BOLA:{motivo:"Suspensão",dataSaida:"2025-01-26"}};
 let clientes = [
@@ -692,7 +699,8 @@ function atrasado(p){return p.st!=="ENTREGUE"&&p.st!=="PROG"&&p.ate<HOJE}
 function diasAtraso(p){const a=new Date(p.ate),h=new Date(HOJE);return Math.round((h-a)/86400000)}
 const $=s=>document.querySelector(s);
 function toast(m){const t=$("#toast");t.innerHTML=m;t.classList.add("on");clearTimeout(window._t);window._t=setTimeout(()=>t.classList.remove("on"),3800)}
-function carDe(mot){return frota.find(x=>x.mot===mot)||{cav:"—",car:"—",cat:"",wa:""}}
+function carDe(mot){const v=frota.find(x=>x.mot===mot)||{};const m=motoristas.find(x=>x.nome===mot)||{};return {cav:v.cav||"—",car:v.car||"—",cat:m.cat||v.cat||"",wa:m.wa||v.wa||"",laudoAnual:v.laudoAnual,laudoTrim:v.laudoTrim};}
+function platesHTMLBigV(f){return `<div class="plates" style="flex:1 1 220px"><div class="pl big"><span class="ti">🚚</span><span class="plate big">${f.cav||"—"}</span><span>cavalo</span></div><div class="pl big"><span class="ti">▭</span>${f.car&&f.car!=="—"?`<span class="plate big">${f.car}</span><span>carreta</span>`:`<span class="plate muted">sem carreta</span>`}</div></div>`}
 function fmtD(iso){if(!iso)return"—";const[a,m,d]=iso.split("-");return d+"/"+m}
 function agora(){return new Date()}
 function dataExtenso(){const ms=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];const d=new Date();return `${String(d.getDate()).padStart(2,"0")} de ${ms[d.getMonth()]} de ${d.getFullYear()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
@@ -733,48 +741,67 @@ function fv(id){const e=document.getElementById(id);return e?e.value.trim():""}
 function fldHTML(id,label,val,full,type){return `<div class="fld ${full?"full":""}"><label>${label}</label><input id="${id}" type="${type||"text"}" value="${(val||"").toString().replace(/"/g,"&quot;")}"></div>`}
 function selHTML(id,label,opts,sel,full){return `<div class="fld ${full?"full":""}"><label>${label}</label><select id="${id}">${opts.map(o=>`<option ${o===sel?"selected":""}>${o}</option>`).join("")}</select></div>`}
 
-// incluir novo conjunto (caminhão + motorista) pela aba Frota
+// incluir VEÍCULO pela aba Frota (motorista é escolhido numa lista — vínculo livre)
 function incluirFrota(){
-  openForm("Incluir caminhão","Cadastra o conjunto (motorista, placas e WhatsApp)",
-    fldHTML("nNome","Nome / apelido do motorista","")+
-    selHTML("nCat","Categoria",["FROTA","NÚCLEO","AGREGADO","TERCEIRO"],"FROTA")+
+  const opcoes=["— sem motorista —",...motoristas.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(m=>m.nome)];
+  openForm("Incluir caminhão","Placas, laudos e motorista vinculado (opcional)",
+    selHTML("nMotSel","Motorista vinculado",opcoes,"— sem motorista —",true)+
     fldHTML("nCav","Placa do cavalo","")+
     fldHTML("nCar","Placa da carreta","")+
-    fldHTML("nWa","WhatsApp do motorista","",true),
+    fldHTML("nLaudoAnual","Vencimento laudo ANUAL","",true,"date")+
+    fldHTML("nLaudoTrim","Vencimento laudo TRIMESTRAL","",true,"date"),
     ()=>{
-      const nome=fv("nNome").toUpperCase();
-      if(!nome){toast("Informe o nome do motorista.");return;}
-      frota.push({mot:nome,cav:fv("nCav").toUpperCase()||"—",car:fv("nCar").toUpperCase()||"—",cat:fv("nCat"),rast:true,wa:fv("nWa")});
-      log("Caminhão/motorista "+nome+" incluído");
-      closeForm();renderAll();toast("✓ "+nome+" incluído.");
+      let drv=fv("nMotSel");if(drv==="— sem motorista —")drv="";
+      if(drv)frota.forEach(o=>{if(o.mot===drv)o.mot="";}); // 1 motorista dirige no máximo 1 veículo
+      frota.push({mot:drv,cav:fv("nCav").toUpperCase()||"—",car:fv("nCar").toUpperCase()||"—",rast:true,laudoAnual:fv("nLaudoAnual")||"",laudoTrim:fv("nLaudoTrim")||"",anexos:[]});
+      log("Caminhão "+(fv("nCav").toUpperCase()||"novo")+" incluído"+(drv?" (motorista "+drv+")":""));
+      closeForm();renderAll();toast("✓ Caminhão incluído.");
     });
 }
-// editar cadastro de motorista / frota (troca de cavalo, carreta, whats)
+// editar: ctx 'mot' edita o MOTORISTA (cadastro independente); ctx 'frota' edita o VEÍCULO
 function editMot(i,ctx){
-  const f=frota[i];
-  const ehFrota=ctx==="frota";
-  openForm(ehFrota?"Editar caminhão":"Editar motorista",ehFrota?"Placas, categoria e situação do caminhão":"Nome e WhatsApp do motorista",
-    fldHTML("eNome","Nome / apelido",f.mot)+
-    selHTML("eCat","Categoria",["FROTA","NÚCLEO","AGREGADO","TERCEIRO"],f.cat)+
+  if(ctx==="frota"){editVeiculo(i);return;}
+  const m=motoristas[i];if(!m)return;
+  openForm("Editar motorista","Nome, categoria e WhatsApp",
+    fldHTML("eNome","Nome / apelido",m.nome)+
+    selHTML("eCat","Categoria",["FROTA","NÚCLEO","AGREGADO","TERCEIRO"],m.cat||"FROTA")+
+    fldHTML("eWa","WhatsApp do motorista",m.wa,true),
+    ()=>{
+      const old=m.nome;const novo=fv("eNome").toUpperCase()||m.nome;
+      if(novo!==old&&motoristas.some(x=>x!==m&&x.nome===novo)){toast("⚠ Já existe motorista com esse nome.");return;}
+      m.nome=novo;m.cat=fv("eCat");m.wa=fv("eWa");
+      if(old!==novo){ // propaga a troca de nome para os vínculos por nome
+        frota.forEach(f=>{if(f.mot===old)f.mot=novo});
+        pedidos.forEach(p=>{if(p.mot===old)p.mot=novo});
+        abast.forEach(a=>{if(a.mot===old)a.mot=novo});
+        if(manutSet.delete(old))manutSet.add(novo);
+        if(manutData[old]){manutData[novo]=manutData[old];delete manutData[old];}
+      }
+      log("Motorista editado: "+novo);closeForm();renderAll();toast("✓ Motorista atualizado.");
+    });
+}
+function editVeiculo(i){
+  const f=frota[i];if(!f)return;
+  const opcoes=["— sem motorista —",...motoristas.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(m=>m.nome)];
+  const ativoMot=f.mot||"";
+  openForm("Editar caminhão","Placas, laudos e motorista vinculado",
+    selHTML("eMotSel","Motorista vinculado",opcoes,ativoMot||"— sem motorista —",true)+
     fldHTML("eCav","Placa do cavalo",f.cav)+
     fldHTML("eCar","Placa da carreta",f.car)+
-    fldHTML("eWa","WhatsApp do motorista",f.wa,true)+
-    (ehFrota?fldHTML("eLaudoAnual","Vencimento laudo ANUAL",f.laudoAnual||"",true,"date"):"")+
-    (ehFrota?fldHTML("eLaudoTrim","Vencimento laudo TRIMESTRAL",f.laudoTrim||"",true,"date"):"")+
-    (ehFrota?selHTML("eMan","Situação do caminhão",["Ativo","Em manutenção"],manutSet.has(f.mot)?"Em manutenção":"Ativo",true):"")+
-    (ehFrota?fldHTML("eManMot","Motivo da manutenção",(manutData[f.mot]||{}).motivo||"",true):"")+
-    (ehFrota?fldHTML("eManData","Previsão de retorno",(manutData[f.mot]||{}).dataSaida||"",true,"date"):""),
+    fldHTML("eLaudoAnual","Vencimento laudo ANUAL",f.laudoAnual||"",true,"date")+
+    fldHTML("eLaudoTrim","Vencimento laudo TRIMESTRAL",f.laudoTrim||"",true,"date")+
+    selHTML("eMan","Situação do caminhão",["Ativo","Em manutenção"],manutSet.has(ativoMot)&&ativoMot?"Em manutenção":"Ativo",true)+
+    fldHTML("eManMot","Motivo da manutenção",(manutData[ativoMot]||{}).motivo||"",true)+
+    fldHTML("eManData","Previsão de retorno",(manutData[ativoMot]||{}).dataSaida||"",true,"date"),
     ()=>{
-      const old=f.mot;
-      f.mot=fv("eNome").toUpperCase()||f.mot;f.cat=fv("eCat");f.cav=fv("eCav").toUpperCase();f.car=fv("eCar").toUpperCase();f.wa=fv("eWa");
-      if(old!==f.mot){pedidos.forEach(p=>{if(p.mot===old)p.mot=f.mot});if(manutSet.delete(old)){manutSet.add(f.mot)}if(manutData[old]){manutData[f.mot]=manutData[old];delete manutData[old]}}
-      if(ehFrota){
-        f.laudoAnual=fv("eLaudoAnual")||"";f.laudoTrim=fv("eLaudoTrim")||"";
-        manutSet.delete(f.mot);delete manutData[f.mot];
-        if(fv("eMan")==="Em manutenção"){manutSet.add(f.mot);manutData[f.mot]={motivo:fv("eManMot"),dataSaida:fv("eManData")};}
-      }
-      log("Cadastro editado: "+f.mot+" ("+f.cav+(f.car&&f.car!=="—"?"/"+f.car:"")+")");
-      closeForm();renderAll();toast("✓ Cadastro de "+f.mot+" atualizado.");
+      f.cav=fv("eCav").toUpperCase()||"—";f.car=fv("eCar").toUpperCase()||"—";f.laudoAnual=fv("eLaudoAnual")||"";f.laudoTrim=fv("eLaudoTrim")||"";
+      let drv=fv("eMotSel");if(drv==="— sem motorista —")drv="";
+      if(drv)frota.forEach(o=>{if(o!==f&&o.mot===drv)o.mot="";}); // 1 motorista em no máximo 1 veículo
+      const oldMot=f.mot;if(oldMot){manutSet.delete(oldMot);delete manutData[oldMot];}
+      f.mot=drv;
+      if(drv){manutSet.delete(drv);delete manutData[drv];if(fv("eMan")==="Em manutenção"){manutSet.add(drv);manutData[drv]={motivo:fv("eManMot"),dataSaida:fv("eManData")};}}
+      log("Caminhão "+(f.cav||"")+" atualizado"+(drv?" (motorista "+drv+")":" (sem motorista)"));
+      closeForm();renderAll();toast("✓ Caminhão atualizado.");
     });
 }
 function msgPedido(p){const f=carDe(p.mot);const c=cliDe(p.cli);return `*RCBMIX LOGÍSTICA*\n${dataExtenso()}\n\nOlá, ${p.mot}!\nNova carga programada:\n\nPedido: ${p.ped||"(a confirmar)"}\nCarregar em: ${p.fab||"Votorantim"}\nDestino: ${p.cli}${c.cidade?" - "+c.cidade:""}\nQuantidade: ${p.qtd}t\nPlaca: ${f.cav} / ${f.car}\nData: ${fmtD(p.de)}${p.ate!==p.de?" a "+fmtD(p.ate):""}\n${c.local?"📍 Localização: "+c.local+"\n":""}${c.tel?"☎ Contato cliente: "+c.tel+"\n":""}\nAo finalizar, responda *OK ENTREGA*.`}
@@ -869,7 +896,7 @@ function painelCli(i){
 }
 function painelMot(i){
   const p=pedidos[i];
-  const mots=["— sem motorista —",...frota.filter(f=>!manutSet.has(f.mot)).slice().sort((a,b)=>a.mot.localeCompare(b.mot,"pt-BR")).map(f=>{const o=pedidos.find(x=>x.mot===f.mot&&x.st!=="ENTREGUE"&&x!==p);return f.mot+(o?" (em "+o.cli+" - "+o.st.toLowerCase()+")":"");})];
+  const mots=["— sem motorista —",...motoristas.filter(m=>!manutSet.has(m.nome)).slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(m=>{const o=pedidos.find(x=>x.mot===m.nome&&x.st!=="ENTREGUE"&&x!==p);return m.nome+(o?" (em "+o.cli+" - "+o.st.toLowerCase()+")":"");})];
   openForm("Trocar motorista","Pedido "+(p.ped||"s/nº"),
     selHTML("pMot","Motorista",mots,p.mot||"— sem motorista —",true),
     ()=>{const old=p.mot;const v=fv("pMot");p.mot=(v==="— sem motorista —")?"":v.replace(/ \(em .*\)$/,"");if(old!==p.mot)log("Troca de motorista no pedido "+(p.ped||"s/nº")+": "+(old||"-")+" → "+(p.mot||"-"));closeForm();renderAll();toast("✓ Motorista atualizado.");});
@@ -893,7 +920,7 @@ function renderPed(){
   $("#statusFilterLabel").textContent=label;
   $("#pedCount").textContent=lista.length;
   $("#pedBody").innerHTML=lista.map(x=>pedCard(x.p,x.i,true)).join("");
-  $("#upMot").innerHTML=`<option value="">— sem motorista —</option>`+frota.filter(f=>!manutSet.has(f.mot)).slice().sort((a,b)=>a.mot.localeCompare(b.mot,"pt-BR")).map(f=>{const p=pedidos.find(x=>x.mot===f.mot&&x.st!=="ENTREGUE");return `<option>${f.mot}${p?" ("+p.cli+" - "+p.st.toLowerCase()+")":""}</option>`;}).join("");
+  $("#upMot").innerHTML=`<option value="">— sem motorista —</option>`+motoristas.filter(m=>!manutSet.has(m.nome)).slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(m=>{const p=pedidos.find(x=>x.mot===m.nome&&x.st!=="ENTREGUE");return `<option>${m.nome}${p?" ("+p.cli+" - "+p.st.toLowerCase()+")":""}</option>`;}).join("");
   $("#upCli").innerHTML=clientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(c=>`<option>${c.nome}</option>`).join("");
   $("#upFab").innerHTML='<option value="">— selecione a fábrica —</option>'+fabricas.map(f=>`<option>${f}</option>`).join("");
 }
@@ -911,7 +938,7 @@ function voltar(i){const idx=FLOW.indexOf(pedidos[i].st);if(idx>0)pedidos[i].st=
 function delPedido(i){if(confirm("Excluir este pedido?")){log(`Pedido ${pedidos[i].ped||"s/nº"} excluído`);pedidos.splice(i,1);renderAll();toast("Pedido excluído.")}}
 function editar(i){
   const p=pedidos[i];
-  const mots=["— sem motorista —",...frota.filter(f=>!manutSet.has(f.mot)).map(f=>f.mot)];
+  const mots=["— sem motorista —",...motoristas.filter(m=>!manutSet.has(m.nome)).slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(m=>m.nome)];
   openForm("Editar pedido","Troca de motorista, destino e datas",
     fldHTML("ePed","Nº do pedido",p.ped,true)+
     selHTML("eFab","Fábrica (origem)",fabricas,p.fab||fabricas[0],true)+
@@ -997,23 +1024,24 @@ function renderFrota(){
   $("#frotaResumo").innerHTML=`<b>RESUMO:</b><div class="lg"><span class="sw" style="background:#FF9F45"></span>${c.VIAGEM} em viagem</div><div class="lg"><span class="sw" style="background:#d6c000"></span>${c.CARREG} carregando</div><div class="lg"><span class="sw" style="background:#8a6fc0"></span>${c.AGUARD} aguard.</div><div class="lg"><span class="sw" style="background:#3B8BD4"></span>${c.ENVIADO} enviado</div><div class="lg"><span class="sw" style="background:#FF7A7A"></span>${c.manut} manut.</div><div class="lg"><span class="sw" style="background:#5b6470"></span>${c.disp} disponíveis</div>`;
   const lbl={MANUT:"Manutenção",ENVIADO:"Pedido enviado",CARREG:"Carregando",VIAGEM:"Em viagem",AGUARD:"Aguard. descarga",DISP:"Disponível"};
   const busca=$("#frotaBusca")?$("#frotaBusca").value.toUpperCase():"";
-  const frotaFiltrada=busca?frota.filter(f=>f.mot.includes(busca)||f.cav.includes(busca)||(f.car||"").includes(busca)):frota;
-  $("#frotaBody").innerHTML=laudoBannerHTML()+frotaFiltrada.map((f,i)=>{const idx=frota.indexOf(f);const s=statusDe(f.mot);const p=pedidos.find(p=>p.mot===f.mot&&p.st!=="ENTREGUE"&&p.st!=="PROG");return `<div class="item ${s==="DISP"?"":"s-"+s}">${platesHTMLBig(f.mot)}<div class="who"><b>${f.mot}</b><span class="cat">${f.cat}</span></div><div class="dest"><div class="c">${lbl[s]}</div><div class="p${p?"":" empty"}">${p?p.cli+" · "+(p.ped||"s/nº"):"sem carga"}</div></div><div class="qtd">${f.rast?"📡":"⚠"}</div><div class="actions"><button class="iconbtn wa" style="width:auto;padding:0 10px;gap:5px" onclick="anexarFrota(${idx})" title="anexar documento / laudo da carreta">📎 Anexar</button><button class="iconbtn" style="width:auto;padding:0 10px;gap:5px" onclick="editMot(${idx},'frota')" title="editar cadastro do caminhão">✎ Editar</button></div>${laudoLinha(f)}${(f.anexos&&f.anexos.length)?`<div class="anexos">${anexosHTML(f,'frota',idx)}</div>`:""}</div>`}).join("");
+  const frotaFiltrada=busca?frota.filter(f=>(f.mot||"").includes(busca)||(f.cav||"").includes(busca)||(f.car||"").includes(busca)):frota;
+  $("#frotaBody").innerHTML=laudoBannerHTML()+frotaFiltrada.map((f,i)=>{const idx=frota.indexOf(f);const s=f.mot?statusDe(f.mot):"DISP";const p=f.mot?pedidos.find(p=>p.mot===f.mot&&p.st!=="ENTREGUE"&&p.st!=="PROG"):null;const cat=f.mot?(carDe(f.mot).cat||""):"";return `<div class="item ${s==="DISP"?"":"s-"+s}">${platesHTMLBigV(f)}<div class="who"><b>${f.mot||"— sem motorista —"}</b><span class="cat">${cat}</span></div><div class="dest"><div class="c">${lbl[s]}</div><div class="p${p?"":" empty"}">${p?p.cli+" · "+(p.ped||"s/nº"):(f.mot?"sem carga":"vincule um motorista")}</div></div><div class="qtd">${f.rast?"📡":"⚠"}</div><div class="actions"><button class="iconbtn wa" style="width:auto;padding:0 10px;gap:5px" onclick="anexarFrota(${idx})" title="anexar documento / laudo da carreta">📎 Anexar</button><button class="iconbtn" style="width:auto;padding:0 10px;gap:5px" onclick="editMot(${idx},'frota')" title="editar caminhão e motorista vinculado">✎ Editar</button></div>${laudoLinha(f)}${(f.anexos&&f.anexos.length)?`<div class="anexos">${anexosHTML(f,'frota',idx)}</div>`:""}</div>`}).join("");
 }
 
 // ===== MOTORISTAS =====
 function renderMot(){
+  migrarMotoristas();
   const busca=$("#motBusca")?$("#motBusca").value.toUpperCase():"";
-  const filtrados=frota.filter(f=>f.mot.includes(busca)).sort((a,b)=>a.mot.localeCompare(b.mot,"pt-BR"));
-  $("#motCount").textContent=filtrados.length;
-  $("#motBody").innerHTML=filtrados.map((f,i)=>{const idx=frota.indexOf(f);return `<div class="item"><div class="who" style="flex:1 1 220px"><b style="font-size:17px">${f.mot}</b><span class="cat">${f.cat}</span></div><div class="dest"><div class="c">📱 ${f.wa||"sem WhatsApp"}</div></div><div class="actions"><button class="iconbtn" onclick="editMot(${idx},'mot')" title="editar">✎</button><button class="iconbtn del" onclick="delMot(${idx})" title="excluir">🗑</button></div></div>`}).join("");
+  const filtrados=motoristas.filter(m=>m.nome.toUpperCase().includes(busca)).sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR"));
+  if($("#motCount"))$("#motCount").textContent=filtrados.length;
+  $("#motBody").innerHTML=filtrados.map((m)=>{const idx=motoristas.indexOf(m);const v=frota.find(x=>x.mot===m.nome);const veic=v?`🚚 ${v.cav}${v.car&&v.car!=="—"?" · "+v.car:""}`:"sem veículo vinculado";return `<div class="item"><div class="who" style="flex:1 1 220px"><b style="font-size:17px">${m.nome}</b><span class="cat">${m.cat||""}</span></div><div class="dest"><div class="c">📱 ${m.wa||"sem WhatsApp"}</div><div class="p${v?"":" empty"}">${veic}</div></div><div class="actions"><button class="iconbtn" onclick="editMot(${idx},'mot')" title="editar">✎</button><button class="iconbtn del" onclick="delMot(${idx})" title="excluir">🗑</button></div></div>`}).join("");
 }
 function toggleAdd(){const b=$("#addBox");b.style.display=b.style.display==="none"?"block":"none"}
-function addMot(){const nome=$("#nmNome").value.trim().toUpperCase();if(!nome){toast("Informe o nome.");return;}frota.push({mot:nome,cav:$("#nmCav").value.trim().toUpperCase()||"—",car:$("#nmCar").value.trim().toUpperCase()||"—",cat:$("#nmCat").value,rast:true,wa:$("#nmWa").value.trim(),laudoAnual:$("#nmLaudoAnual").value||"",laudoTrim:$("#nmLaudoTrim").value||"",anexos:[]});$("#nmNome").value=$("#nmCav").value=$("#nmCar").value=$("#nmWa").value=$("#nmLaudoAnual").value=$("#nmLaudoTrim").value="";toggleAdd();log("Motorista "+nome+" incluído");renderAll();toast("✓ "+nome+" incluído.")}
-function delMot(i){const f=frota[i];if(pedidos.some(p=>p.mot===f.mot&&p.st!=="ENTREGUE"&&p.st!=="PROG")){toast("⚠ "+f.mot+" tem carga ativa.");return;}if(confirm("Excluir "+f.mot+"?")){log("Motorista "+f.mot+" excluído");frota.splice(i,1);manutSet.delete(f.mot);renderAll();toast(f.mot+" excluído.")}}
+function addMot(){const nome=$("#nmNome").value.trim().toUpperCase();if(!nome){toast("Informe o nome.");return;}if(motoristas.some(m=>m.nome===nome)){toast("⚠ Já existe motorista com esse nome.");return;}motoristas.push({nome:nome,cat:$("#nmCat").value,wa:$("#nmWa").value.trim()});$("#nmNome").value=$("#nmWa").value="";toggleAdd();log("Motorista "+nome+" incluído");renderAll();toast("✓ "+nome+" incluído.")}
+function delMot(i){const m=motoristas[i];if(!m)return;if(pedidos.some(p=>p.mot===m.nome&&p.st!=="ENTREGUE"&&p.st!=="PROG")){toast("⚠ "+m.nome+" tem carga ativa.");return;}if(confirm("Excluir o motorista "+m.nome+"?")){log("Motorista "+m.nome+" excluído");frota.forEach(f=>{if(f.mot===m.nome)f.mot="";});manutSet.delete(m.nome);delete manutData[m.nome];motoristas.splice(i,1);renderAll();toast(m.nome+" excluído.")}}
 
 // ===== ABASTECIMENTO =====
-function renderAbastForm(){$("#abMot").innerHTML=frota.slice().sort((a,b)=>a.mot.localeCompare(b.mot,"pt-BR")).map(f=>`<option>${f.mot}</option>`).join("");$("#abPosto").innerHTML=postos.map(p=>`<option>${p.nome}</option>`).join("");abMotChange()}
+function renderAbastForm(){migrarMotoristas();$("#abMot").innerHTML=motoristas.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(m=>`<option>${m.nome}</option>`).join("");$("#abPosto").innerHTML=postos.map(p=>`<option>${p.nome}</option>`).join("");abMotChange()}
 function ehFrota(mot){const c=(carDe(mot).cat||"");return c==="FROTA"||c==="NÚCLEO"}
 function abMotChange(){const f=carDe($("#abMot").value);$("#abPlaca").value=f.cav;}
 function abrirAbastPara(mot){$("#abMot").value=mot;abMotChange();go('abast');}
@@ -1085,11 +1113,13 @@ function exportCli(){dl("clientes_rcb.csv",["Nome","Cidade destino","Telefone","
 // ===== PERSISTÊNCIA: CACHE LOCAL (localStorage) + NUVEM (Supabase) =====
 let _ignorarProximoSalvarNuvem=false; // evita "eco" após receber dado de outro aparelho
 let _nuvemPronta=false; // só envia à nuvem depois de ler a nuvem (não sobrescreve com dado velho)
+let _carregado=false; // só salva (local e nuvem) depois de carregar os dados reais (evita gravar a semente)
 
 // ---- cache local (rápido, funciona offline) ----
 function salvarLocal(){
   try{
     localStorage.setItem("rcb_frota",JSON.stringify(frota));
+    localStorage.setItem("rcb_motoristas",JSON.stringify(motoristas));
     localStorage.setItem("rcb_clientes",JSON.stringify(clientes));
     localStorage.setItem("rcb_pedidos",JSON.stringify(pedidos));
     localStorage.setItem("rcb_abast",JSON.stringify(abast));
@@ -1107,6 +1137,7 @@ function lerChave(k){
 }
 function carregarLocal(){
   const f=lerChave("rcb_frota");if(Array.isArray(f)&&f.length)frota=f;
+  const mt=lerChave("rcb_motoristas");if(Array.isArray(mt)&&mt.length)motoristas=mt;
   const c=lerChave("rcb_clientes");if(Array.isArray(c)&&c.length)clientes=c;
   const p=lerChave("rcb_pedidos");if(Array.isArray(p))pedidos=p;
   const a=lerChave("rcb_abast");if(Array.isArray(a))abast=a;
@@ -1115,11 +1146,13 @@ function carregarLocal(){
   const m=lerChave("rcb_manut");if(Array.isArray(m)){manutSet.clear();m.forEach(x=>manutSet.add(x));}
   const md=lerChave("rcb_manutData");if(typeof md==="object"&&md!==null)Object.assign(manutData,md);
   const de=lerChave("rcb_docsExtra");if(Array.isArray(de))docsExtra=de;
+  migrarMotoristas();
 }
 
 // ---- nuvem (Supabase) ----
 function aplicarLinha(chave,dados){
   if(chave==="frota"&&Array.isArray(dados)&&dados.length)frota=dados;
+  else if(chave==="motoristas"&&Array.isArray(dados)){motoristas=dados;_motoristasNaNuvem=true;}
   else if(chave==="clientes"&&Array.isArray(dados)&&dados.length)clientes=dados;
   else if(chave==="pedidos"&&Array.isArray(dados))pedidos=dados;
   else if(chave==="abast"&&Array.isArray(dados))abast=dados;
@@ -1136,6 +1169,8 @@ async function lerNuvem(){
     if(error){console.error("Erro lendo nuvem:",error);return false;}
     if(!data||!data.length)return "vazio"; // nuvem ainda sem dados
     data.forEach(r=>aplicarLinha(r.chave,r.dados));
+    // se a nuvem ainda não tem o cadastro 'motoristas', deriva da frota AUTORITATIVA (recém-carregada)
+    if(!_motoristasNaNuvem)buildMotoristasFromFrota();
     return true;
   }catch(e){console.error("Falha lendo nuvem:",e);return false;}
 }
@@ -1147,7 +1182,7 @@ function salvarNuvem(){
     try{
       const agoraISO=new Date().toISOString();
       const linhas=[
-        {chave:"frota",dados:frota},{chave:"clientes",dados:clientes},
+        {chave:"frota",dados:frota},{chave:"motoristas",dados:motoristas},{chave:"clientes",dados:clientes},
         {chave:"pedidos",dados:pedidos},{chave:"abast",dados:abast},
         {chave:"postos",dados:postos},{chave:"fabricas",dados:fabricas},{chave:"manut",dados:[...manutSet]},
         {chave:"manutData",dados:manutData},{chave:"docsExtra",dados:docsExtra},
@@ -1160,6 +1195,7 @@ function salvarNuvem(){
 
 // ---- funções usadas pelo app ----
 function salvarDados(){
+  if(!_carregado)return; // ainda carregando dados reais → não grava a semente
   salvarLocal();
   if(!_nuvemPronta)return; // ainda não leu a nuvem → não envia (evita sobrescrever)
   if(_ignorarProximoSalvarNuvem){_ignorarProximoSalvarNuvem=false;return;}
@@ -1169,10 +1205,11 @@ async function carregarDados(){
   carregarLocal(); // mostra algo na hora
   if(sb){
     const r=await lerNuvem();
-    _nuvemPronta=true;
+    _nuvemPronta=true;_carregado=true;
     if(r==="vazio"){salvarNuvem();} // 1ª vez: envia os dados atuais para a nuvem
+    else if(!_motoristasNaNuvem){salvarNuvem();} // grava o cadastro de motoristas recém-derivado da frota
   }else{
-    _nuvemPronta=true; // sem nuvem configurada: salva só no cache local
+    _nuvemPronta=true;_carregado=true; // sem nuvem configurada: salva só no cache local
   }
 }
 let _reloadTimer=null;
@@ -1297,8 +1334,8 @@ function renderProg(){
 
   $("#progFrotaList").innerHTML=frotaDisp.map(({f,i,atual,cap})=>`
     <div onclick="progSelecionaFrota(${i})" style="cursor:pointer;padding:12px;background:var(--card);border:2px solid var(--linha);border-radius:9px;transition:.2s;user-select:none" onmouseover="this.style.borderColor='var(--vinho)'" onmouseout="this.style.borderColor='var(--linha)'">
-      <div style="font-weight:700;color:var(--vinho);margin-bottom:4px;font-family:monospace;font-size:14px">${f.mot}</div>
-      <div style="font-size:12px;color:var(--cinza)">${f.cat} · ${f.rast?"📡":"⚠"} Rastreador</div>
+      <div style="font-weight:700;color:var(--vinho);margin-bottom:4px;font-family:monospace;font-size:14px">${f.mot||"— sem motorista —"}</div>
+      <div style="font-size:12px;color:var(--cinza)">${f.mot?(carDe(f.mot).cat||""):"sem motorista"} · ${f.rast?"📡":"⚠"} Rastreador</div>
       <div style="font-size:12px;color:var(--cinza2);margin-top:4px">${atual?`Em viagem: ${atual.cli}`:"📍 Disponível"}</div>
       <div style="background:var(--linha);height:4px;border-radius:2px;margin-top:6px;overflow:hidden"><div style="width:${atual?100:0}%;height:100%;background:${atual?'var(--c-viagem)':'var(--c-entregue)'};transition:.2s"></div></div>
     </div>
@@ -1325,6 +1362,7 @@ $("#navM").innerHTML=TABS.map((t,i)=>`<a data-v="${t[0]}" class="${i===0?"on":""
 // inicialização: carrega cache local na hora, depois sincroniza com a nuvem
 $("#vsub").textContent=titles.dash[1]; // mostra a data de hoje no subtítulo do painel
 (function(){const a=$("#upDe"),b=$("#upAte");if(a&&!a.value)a.value=HOJE;if(b&&!b.value)b.value=HOJE;})(); // defaults dos campos de data = hoje
+migrarMotoristas();
 try{renderAbastForm();renderAll();}catch(e){console.error("Erro na renderização inicial:",e);}
 (async()=>{
   try{
