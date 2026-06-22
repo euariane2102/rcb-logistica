@@ -804,7 +804,8 @@ function editVeiculo(i){
       closeForm();renderAll();toast("✓ Caminhão atualizado.");
     });
 }
-function msgPedido(p){const f=carDe(p.mot);const c=cliDe(p.cli);return `*RCBMIX LOGÍSTICA*\n${dataExtenso()}\n\nOlá, ${p.mot}!\nNova carga programada:\n\nPedido: ${p.ped||"(a confirmar)"}\nCarregar em: ${p.fab||"Votorantim"}\nDestino: ${p.cli}${c.cidade?" - "+c.cidade:""}\nQuantidade: ${p.qtd}t\nPlaca: ${f.cav} / ${f.car}\nData: ${fmtD(p.de)}${p.ate!==p.de?" a "+fmtD(p.ate):""}\n${c.local?"📍 Localização: "+c.local+"\n":""}${c.tel?"☎ Contato cliente: "+c.tel+"\n":""}\nAo finalizar, responda *OK ENTREGA*.`}
+function msgPedido(p){const f=carDe(p.mot);const c=cliDe(p.cli);return `*RCBMIX LOGÍSTICA*\n${dataExtenso()}\n\nOlá, ${p.mot}!\nNova carga programada:\n\nPedido: ${p.ped||"(a confirmar)"}\nCarregar em: ${p.fab||"Votorantim"}\nDestino: ${p.cli}${c.cidade?" - "+c.cidade:""}\nQuantidade: ${p.qtd}t\nPlaca: ${f.cav} / ${f.car}\nData de Carregamento: ${fmtD(p.de)}
+Data de Entrega: ${fmtD(p.ate)}\n${c.local?"📍 Localização: "+c.local+"\n":""}${c.tel?"☎ Contato cliente: "+c.tel+"\n":""}\nAo finalizar, responda *OK ENTREGA*.`}
 function msgManut(mot){const d=manutData[mot]||{};return `*RCBMIX LOGÍSTICA*\n${dataExtenso()}\n\nOlá, ${mot}!\nSeu veículo está em manutenção${d.motivo?" ("+d.motivo+")":""}.\n\nPrecisamos atualizar o status.\nQual a previsão de liberação?\n\nResponda:\n*HOJE* — sai hoje\n*AMANHÃ* — sai amanhã\n*SEM PREVISÃO* — ainda sem data\nou informe a data prevista.`}
 function enviarManutWa(mot){const f=carDe(mot);enviarAuto(mot,f.wa,msgManut(mot),"Manutenção → motorista");renderAll();}
 function editarManut(mot){const i=frota.findIndex(f=>f.mot===mot);if(i>=0)editMot(i,"frota");}
@@ -1373,7 +1374,7 @@ try{renderAbastForm();renderAll();}catch(e){console.error("Erro na renderizaçã
 })();
 
 // ===== LOGIN =====
-const USERS=[
+let USERS=JSON.parse(localStorage.getItem("rcb_users"))||[
   {email:"admin@rcbmix.com",senha:"rcb2026",nome:"Gestor",isGestor:true},
   {email:"tiago@rcblog.com",senha:"tiago2026",nome:"Tiago"},
 ];
@@ -1399,7 +1400,7 @@ function abrirAlterarSenha(){
     if(senhaAtual!==user.senha){alert("Senha atual incorreta.");return;}
     if(novaSenha!==confirmarSenha){alert("As senhas não conferem.");return;}
     if(novaSenha.length<6){alert("A nova senha deve ter pelo menos 6 caracteres.");return;}
-    user.senha=novaSenha;
+    user.senha=novaSenha;localStorage.setItem("rcb_users",JSON.stringify(USERS));
     alert("✓ Senha alterada com sucesso!");
     closeForm();
   });
@@ -1411,7 +1412,7 @@ function abrirCadastroUsuario(){
     if(!nome||!email){alert("Preencha todos os campos.");return;}
     if(USERS.find(u=>u.email===email)){alert("E-mail já cadastrado.");return;}
     const senha=Math.random().toString(36).slice(-8);
-    USERS.push({email,senha,nome});
+    USERS.push({email,senha,nome});localStorage.setItem("rcb_users",JSON.stringify(USERS));
     alert("✓ Usuário criado!\nE-mail: "+email+"\nSenha: "+senha);
     closeForm();
   });
