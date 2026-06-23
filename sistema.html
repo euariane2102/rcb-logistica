@@ -223,7 +223,7 @@ body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(-
     <div class="err" id="liErr">E-mail ou senha incorretos.</div>
     <button class="btn btn-p" onclick="doLogin()">Entrar</button>
     <div style="margin-top:16px;text-align:center"><span style="font-size:12px;color:var(--cinza)">Novo usuário? </span><span style="font-size:12px;color:var(--vinho);cursor:pointer;font-weight:600" onclick="abrirCadastroUsuario()">Gerar login e senha</span></div>
-    <div class="foothint">Acesso restrito • RCB Logística • <b>v6 · 23/06</b></div>
+    <div class="foothint">Acesso restrito • RCB Logística • <b>v7 · 23/06</b></div>
   </div>
 </div>
 
@@ -881,7 +881,7 @@ function pedCard(p,i,full){
 }
 function renderDash(){
   // planilha rosa: SOMENTE os pedidos do dia (janela que inclui hoje) + os que seguem ativos em atraso
-  const doDia=pedidos.filter(p=>(p.de<=HOJE&&p.ate>=HOJE)||(p.st!=="ENTREGUE"&&p.st!=="PROG"&&p.ate<HOJE));
+  
   const pedidosOrdenados=[...doDia].sort((a,b)=>a.de.localeCompare(b.de));
   if(!pedidosOrdenados.length){
     $("#dashProgTable").innerHTML=`<tr><td colspan="5" style="text-align:center;color:#9aa3ad;padding:26px">Nenhum pedido para hoje (${HOJE_BR}). Inclua ou programe pedidos na aba <b>Pedidos</b>.</td></tr>`;
