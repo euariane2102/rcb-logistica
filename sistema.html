@@ -1120,7 +1120,10 @@ let _nuvemPronta=false; // só envia à nuvem depois de ler a nuvem (não sobres
 let _carregado=false; // só salva (local e nuvem) depois de carregar os dados reais (evita gravar a semente)
 
 // ---- cache local (rápido, funciona offline) ----
-function salvarLocal(){
+let _localTimer=0;
+function salvarLocal(){clearTimeout(_localTimer);_localTimer=setTimeout(_salvarLocalNow,400);} // debounce: evita serializar tudo a cada ação
+function _salvarLocalNow(){
+  _localTimer=0;
   try{
     localStorage.setItem("rcb_frota",JSON.stringify(frota));
     localStorage.setItem("rcb_motoristas",JSON.stringify(motoristas));
@@ -1356,7 +1359,14 @@ function progSelecionaFrota(i){
   progPedSel=null;
   renderAll();
 }
-function renderAll(){renderAlertas();renderFleet();renderDash();renderDocs();renderProg();renderPed();renderFrota();renderMot();renderCli();renderPostos();renderAbast();renderEnviadas();renderFat();salvarDados();}
+let _renderRAF=0;
+function renderAll(){
+  salvarDados();
+  if(_renderRAF)return; // coalesce chamadas em rajada -> 1 render por frame (anti-travamento no mobile)
+  _renderRAF=requestAnimationFrame(()=>{_renderRAF=0;
+    renderAlertas();renderFleet();renderDash();renderDocs();renderProg();renderPed();renderFrota();renderMot();renderCli();renderPostos();renderAbast();renderEnviadas();renderFat();
+  });
+}
 
 // ===== NAV =====
 const titles={dash:["Painel","Operação de hoje — "+HOJE_BR],docs:["Notas e Manifestos","Todos os anexos de NF-e, manifestos e notas de abastecimento"],ped:["Pedidos","Inclua, programe (data de/até) e envie no WhatsApp"],fat:["Relatórios","Volume transportado, entregas e desempenho"],frota:["Frota","Caminhões — visão geral por status"],mot:["Motoristas","Incluir, editar ou excluir motoristas"],cli:["Clientes","Nome, cidade, localização e telefone"],abast:["Abastecimento","Envio automático ao posto via WhatsApp"]};
@@ -1376,6 +1386,39 @@ try{renderAbastForm();renderAll();}catch(e){console.error("Erro na renderizaçã
     assinarRealtime();
   }catch(e){console.error("Erro na inicialização:",e);}
 })();
+
+// garante que a última alteração seja gravada ao fechar/sair (save local é debounced)
+addEventListener("beforeunload",()=>{try{_salvarLocalNow();}catch(e){}});
+
+// ===== AUTO-ATUALIZAÇÃO (cliente não precisa limpar cache) =====
+// Detecta nova versão publicada comparando o marcador (ETag) do próprio arquivo no servidor
+// e recarrega sozinho — sem interromper quem está digitando.
+(function(){
+  let marcadorInicial=null;
+  async function versaoServidor(){
+    try{
+      const r=await fetch(location.pathname+"?_ts="+Date.now(),{method:"HEAD",cache:"no-store"});
+      return r.headers.get("etag")||r.headers.get("last-modified")||null;
+    }catch(e){return null;}
+  }
+  async function checar(){
+    const v=await versaoServidor();
+    if(!v)return;
+    if(marcadorInicial===null){marcadorInicial=v;return;} // 1ª leitura = versão atual rodando
+    if(v===marcadorInicial)return;
+    // nova versão no ar — não interromper edição
+    if(document.querySelector(".overlay.on"))return;
+    const el=document.activeElement;
+    if(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))return;
+    try{typeof toast==="function"&&toast("🔄 Atualizando para a nova versão...");}catch(e){}
+    try{_salvarLocalNow();}catch(e){}
+    setTimeout(()=>location.reload(),800);
+  }
+  checar();
+  setInterval(checar,60000); // checa a cada 1 min
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)checar();}); // e ao voltar pro app
+})();
+
 
 // ===== LOGIN =====
 let USERS=JSON.parse(localStorage.getItem("rcb_users"))||[
