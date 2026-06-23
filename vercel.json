@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/sistema", "destination": "/sistema.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)\\.html",
