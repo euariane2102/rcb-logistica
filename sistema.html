@@ -646,7 +646,7 @@ let clientes = [
   {nome:"Demamix Quedas do Iguaçu",cidade:"Quedas do Iguaçu/PR",tel:"+554299000020"},
   {nome:"Porto Vale Canelinha",cidade:"Canelinha/SC",tel:"+554899000021"},
 ].map(c=>({...c,local:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(c.nome+" "+c.cidade)}));
-function cliDe(n){return clientes.find(c=>c.nome===n)||{nome:n,cidade:"",local:"",tel:""}}
+function cliDe(n){const k=normMot(n);return clientes.find(c=>normMot(c.nome)===k)||{nome:n,cidade:"",local:"",tel:""}}
 let postos = [
   {nome:"Posto Rota Jaguaruna",wa:"+5548999110001"},
   {nome:"Posto Guarani",wa:"+5545999110002"},
@@ -699,7 +699,7 @@ function atrasado(p){return p.st!=="ENTREGUE"&&p.st!=="PROG"&&p.ate<HOJE}
 function diasAtraso(p){const a=new Date(p.ate),h=new Date(HOJE);return Math.round((h-a)/86400000)}
 const $=s=>document.querySelector(s);
 function toast(m){const t=$("#toast");t.innerHTML=m;t.classList.add("on");clearTimeout(window._t);window._t=setTimeout(()=>t.classList.remove("on"),3800)}
-function carDe(mot){const v=frota.find(x=>x.mot===mot)||{};const m=motoristas.find(x=>x.nome===mot)||{};return {cav:v.cav||"—",car:v.car||"—",cat:m.cat||v.cat||"",wa:m.wa||v.wa||"",laudoAnual:v.laudoAnual,laudoTrim:v.laudoTrim};}
+function carDe(mot){const k=normMot(mot);const v=frota.find(x=>normMot(x.mot)===k)||{};const m=motoristas.find(x=>normMot(x.nome)===k)||{};return {cav:v.cav||"—",car:v.car||"—",cat:m.cat||v.cat||"",wa:m.wa||v.wa||"",laudoAnual:v.laudoAnual,laudoTrim:v.laudoTrim};}
 function platesHTMLBigV(f){return `<div class="plates" style="flex:1 1 220px"><div class="pl big"><span class="ti">🚚</span><span class="plate big">${f.cav||"—"}</span><span>cavalo</span></div><div class="pl big"><span class="ti">▭</span>${f.car&&f.car!=="—"?`<span class="plate big">${f.car}</span><span>carreta</span>`:`<span class="plate muted">sem carreta</span>`}</div></div>`}
 function fmtD(iso){if(!iso)return"—";const[a,m,d]=iso.split("-");return d+"/"+m}
 function agora(){return new Date()}
