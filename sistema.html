@@ -1370,7 +1370,7 @@ function renderAll(){
 
 // ===== NAV =====
 const titles={dash:["Painel","Operação de hoje — "+HOJE_BR],docs:["Notas e Manifestos","Todos os anexos de NF-e, manifestos e notas de abastecimento"],ped:["Pedidos","Inclua, programe (data de/até) e envie no WhatsApp"],fat:["Relatórios","Volume transportado, entregas e desempenho"],frota:["Frota","Caminhões — visão geral por status"],mot:["Motoristas","Incluir, editar ou excluir motoristas"],cli:["Clientes","Nome, cidade, localização e telefone"],abast:["Abastecimento","Envio automático ao posto via WhatsApp"]};
-function go(v){document.querySelectorAll(".view").forEach(x=>x.classList.remove("on"));$("#"+v).classList.add("on");document.querySelectorAll("#navD a,#navM a").forEach(x=>x.classList.toggle("on",x.dataset.v===v));$("#vtitle").textContent=titles[v][0];$("#vsub").textContent=titles[v][1];window.scrollTo(0,0)}
+function go(v){fleetSel=null;document.querySelectorAll(".view").forEach(x=>x.classList.remove("on"));$("#"+v).classList.add("on");document.querySelectorAll("#navD a,#navM a").forEach(x=>x.classList.toggle("on",x.dataset.v===v));$("#vtitle").textContent=titles[v][0];$("#vsub").textContent=titles[v][1];window.scrollTo(0,0)}
 function toggleUploader(){$("#uprowContainer").classList.toggle("hidden");$("#btnrowContainer").classList.toggle("hidden");const icon=$("#uploaderIcon");icon.textContent=icon.textContent==="➕"?"➖":"➕";}
 $("#navD").innerHTML=TABS.map((t,i)=>`<a data-v="${t[0]}" class="${i===0?"on":""}" onclick="go('${t[0]}')"><span class="ic">${t[1]}</span><span class="txt">${t[2]}</span></a>`).join("");
 $("#navM").innerHTML=TABS.map((t,i)=>`<a data-v="${t[0]}" class="${i===0?"on":""}" onclick="go('${t[0]}')"><span class="ic">${t[1]}</span>${t[2]}</a>`).join("");
